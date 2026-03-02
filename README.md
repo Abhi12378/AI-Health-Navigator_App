@@ -1,9 +1,5 @@
 # AI Health Navigator
 
-<div align="center">
-   <img width="1200" height="475" alt="AI Health Navigator Banner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
-
 AI Health Navigator is a full-stack healthcare assistant that helps users:
 - chat about symptoms with medical safety guardrails,
 - upload and analyze medical documents,
