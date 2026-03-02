@@ -140,6 +140,8 @@ const ChatPage = () => {
   const [transcriptPreview, setTranscriptPreview] = useState("");
   const [showDistressWarning, setShowDistressWarning] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const transcriptBufferRef = useRef("");
+  const recordingBaseInputRef = useRef("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -216,6 +218,16 @@ const ChatPage = () => {
   useEffect(() => {
     fetchLabReports();
     fetchPrescriptions();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      try {
+        recognitionRef.current?.stop?.();
+      } catch (error) {
+        console.error('Failed to stop speech recognition on cleanup', error);
+      }
+    };
   }, []);
 
   const fetchNearestEmergencyHospital = () => {
@@ -489,8 +501,18 @@ const ChatPage = () => {
   };
 
   const handleVoiceInput = () => {
-    if (!('webkitSpeechRecognition' in window)) {
-      alert("Speech recognition is not supported in this browser.");
+    const composeInputWithSpeech = (baseText: string, speechText: string) => {
+      const normalizedSpeech = speechText.trim();
+      if (!normalizedSpeech) return baseText;
+      if (!baseText.trim()) return normalizedSpeech;
+      return `${baseText}${baseText.endsWith(' ') ? '' : ' '}${normalizedSpeech}`;
+    };
+
+    const SpeechRecognitionCtor =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognitionCtor) {
+      showToast("Speech recognition is not supported in this browser.", "error");
       return;
     }
 
@@ -500,23 +522,53 @@ const ChatPage = () => {
       return;
     }
 
-    const recognition = new (window as any).webkitSpeechRecognition();
+    const recognition = new SpeechRecognitionCtor();
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = "en-US";
+    const languageCodes: Record<string, string> = {
+      English: "en-US",
+      Hindi: "hi-IN",
+      Marathi: "mr-IN",
+      Telugu: "te-IN",
+      Tamil: "ta-IN",
+      Kannada: "kn-IN",
+    };
+    recognition.lang = languageCodes[language] || "en-US";
     recognitionRef.current = recognition;
 
     recognition.onstart = () => {
       setIsRecording(true);
+      recordingBaseInputRef.current = input;
+      transcriptBufferRef.current = "";
       setTranscriptPreview("");
       setShowDistressWarning(false);
     };
 
     recognition.onend = () => {
       setIsRecording(false);
-      if (transcriptPreview) {
-        setInput(prev => prev + (prev ? " " : "") + transcriptPreview);
+      const finalText = transcriptBufferRef.current.trim();
+      setInput(composeInputWithSpeech(recordingBaseInputRef.current, finalText));
+      recordingBaseInputRef.current = "";
+      transcriptBufferRef.current = "";
+      setTranscriptPreview("");
+    };
+
+    recognition.onerror = (event: any) => {
+      setIsRecording(false);
+
+      const error = String(event?.error || 'unknown');
+      if (error === 'not-allowed' || error === 'service-not-allowed') {
+        showToast('Microphone permission denied. Please allow mic access in browser settings.', 'error');
+      } else if (error === 'no-speech') {
+        showToast('No speech detected. Please try again.', 'warning');
+      } else if (error === 'audio-capture') {
+        showToast('No microphone was found. Check your device audio input.', 'error');
+      } else {
+        showToast('Voice input failed. Please try again.', 'error');
       }
+
+      recordingBaseInputRef.current = "";
+      transcriptBufferRef.current = "";
       setTranscriptPreview("");
     };
 
@@ -532,8 +584,13 @@ const ChatPage = () => {
         }
       }
 
-      const currentText = finalTranscript || interimTranscript;
+      if (finalTranscript) {
+        transcriptBufferRef.current = `${transcriptBufferRef.current} ${finalTranscript}`.trim();
+      }
+
+      const currentText = `${transcriptBufferRef.current} ${interimTranscript}`.trim();
       setTranscriptPreview(currentText);
+      setInput(composeInputWithSpeech(recordingBaseInputRef.current, currentText));
 
       // Distress Detection Logic
       const distressKeywords = ["help", "emergency", "pain", "suicide", "die", "kill", "hurt", "bleeding", "collapse", "heart attack", "stroke", "can't breathe", "cant breathe"];
@@ -542,7 +599,12 @@ const ChatPage = () => {
       }
     };
 
-    recognition.start();
+    try {
+      recognition.start();
+    } catch (error) {
+      setIsRecording(false);
+      showToast('Unable to start microphone input. Please retry.', 'error');
+    }
   };
 
   const handleAddMedicalRecord = async () => {
