@@ -1,0 +1,5 @@
+{
+  "name": "AI Health Navigator",
+  "description": "An AI assistant that helps users understand their symptoms and classifies urgency into Self-care, Doctor Visit, or Emergency.",
+  "requestFramePermissions": ["camera", "microphone"]
+}

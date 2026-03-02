@@ -1,0 +1,15 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "BedrockCoreAccess",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock:ListFoundationModels",
+        "bedrock:InvokeModel",
+        "bedrock:Converse"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

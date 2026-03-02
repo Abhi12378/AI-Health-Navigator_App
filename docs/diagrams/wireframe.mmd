@@ -1,0 +1,79 @@
+flowchart TB
+    %% ===== Monochrome Wireframe Style (PPT friendly) =====
+    classDef frame fill:#FFFFFF,stroke:#111827,stroke-width:1.6px,color:#111827
+    classDef block fill:#F8FAFC,stroke:#334155,stroke-width:1.2px,color:#111827
+    classDef cta fill:#E2E8F0,stroke:#0F172A,stroke-width:1.2px,color:#0F172A
+    classDef modal fill:#F1F5F9,stroke:#1E293B,stroke-width:1.4px,stroke-dasharray: 4 3,color:#0F172A
+    classDef note fill:#FFFFFF,stroke:#64748B,stroke-width:1px,color:#334155
+
+    A[AI Health Navigator - Wireframe Set]:::frame --> B[1) Login Screen]:::frame
+    A --> C[2) Chat Workspace]:::frame
+    A --> D[3) Admin Dashboard]:::frame
+
+    %% ===== Login Wireframe =====
+    subgraph B [1) Login Screen]
+        direction TB
+        B1[Top Hero\n- Brand / Tagline\n- Trust badges]:::block
+        B2[Auth Card]:::block
+        B21[Google Sign-In Button]:::cta
+        B22[Continue as Guest Button]:::cta
+        B3[Footer Links\nTerms / Privacy]:::note
+
+        B1 --> B2 --> B3
+        B2 --> B21
+        B2 --> B22
+    end
+
+    %% ===== Chat Workspace Wireframe =====
+    subgraph C [2) Chat Workspace]
+        direction LR
+
+        subgraph CLEFT [Left Sidebar]
+            direction TB
+            C1[New Chat]:::cta
+            C2[Recent Chats List]:::block
+            C3[Lab Reports Section]:::block
+            C4[Prescriptions Section]:::block
+            C5[Emergency Mode Toggle]:::cta
+            C6[Language Selector]:::block
+            C7[Logout]:::note
+        end
+
+        subgraph CMAIN [Main Chat Panel]
+            direction TB
+            C8[Top Bar\nUser + Actions]:::block
+            C9[Message Stream\nUser / AI cards]:::block
+            C10[Risk Assessment Card\n(Low/Moderate/High)]:::block
+            C11[Composer Area\nText Input + Send + Upload + Voice]:::cta
+            C8 --> C9 --> C10 --> C11
+        end
+
+        subgraph CRIGHT [Utility / Context Panel]
+            direction TB
+            C12[Hospital Quick Access]:::block
+            C13[Privacy Center Access]:::block
+            C14[Medical History Snapshot]:::block
+        end
+
+        CLEFT --> CMAIN --> CRIGHT
+
+        C15[Document Upload Modal\nDrag & Drop + Analysis Result]:::modal
+        C16[Hospital Locator Modal\nSearch + Filters + Navigate/Call]:::modal
+        C17[Confirmation / Toast Components]:::modal
+
+        CMAIN -.opens.-> C15
+        CMAIN -.opens.-> C16
+        CMAIN -.triggers.-> C17
+    end
+
+    %% ===== Admin Dashboard Wireframe =====
+    subgraph D [3) Admin Dashboard]
+        direction TB
+        D1[Header\nDate range + Export]:::block
+        D2[KPI Cards Row\nUsers, Chats, Self-care, Emergency]:::block
+        D3[Usage Trend Chart]:::block
+        D4[Severity Pie Chart]:::block
+        D5[Activity Heatmap]:::block
+        D1 --> D2 --> D3
+        D3 --> D4 --> D5
+    end

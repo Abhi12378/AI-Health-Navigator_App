@@ -1,0 +1,70 @@
+flowchart LR
+    %% ===== Styles =====
+    classDef client fill:#EEF2FF,stroke:#4F46E5,stroke-width:1.2px,color:#111827
+    classDef server fill:#ECFDF5,stroke:#059669,stroke-width:1.2px,color:#111827
+    classDef service fill:#FFF7ED,stroke:#EA580C,stroke-width:1.2px,color:#111827
+    classDef data fill:#F8FAFC,stroke:#475569,stroke-width:1.2px,color:#111827
+    classDef external fill:#FEF2F2,stroke:#DC2626,stroke-width:1.2px,color:#111827
+
+    subgraph C[Client Layer (React + Vite + TypeScript)]
+        C1[Login Page\nGoogle / Guest]:::client
+        C2[Chat Page\nSymptom Chat + Uploads]:::client
+        C3[Hospital Locator UI]:::client
+        C4[Privacy Center / Admin Dashboard]:::client
+        C5[Auth Context + API Utility]:::client
+    end
+
+    subgraph S[Application Layer (Node.js + Express)]
+        S1[Auth & Session\nPassport + express-session]:::server
+        S2[Chat Controller\n/api/chat]:::server
+        S3[Document Controller\nlab reports + prescriptions]:::server
+        S4[Hospital Controller\n/api/hospitals/nearby]:::server
+        S5[Medical History Controller]:::server
+        S6[Fallback Router\nBedrock -> Gemini]:::server
+    end
+
+    subgraph D[Data Layer (Current Runtime Storage)]
+        D1[(Session Store\n(in-memory/default))]:::data
+        D2[(medicalHistories\nper user)]:::data
+        D3[(labReportsByUser\nper user)]:::data
+        D4[(prescriptionsByUser\nper user)]:::data
+    end
+
+    subgraph X[External Services]
+        X1[AWS Bedrock Runtime\nClaude model]:::external
+        X2[Google Gemini API]:::external
+        X3[Google Places API]:::external
+        X4[AWS Textract]:::external
+        X5[AWS Comprehend Medical]:::external
+        X6[AWS S3]:::external
+    end
+
+    %% Client -> Server
+    C1 --> S1
+    C2 --> S2
+    C2 --> S3
+    C3 --> S4
+    C2 --> S5
+    C5 --> S1
+    C5 --> S2
+    C5 --> S3
+    C5 --> S4
+    C5 --> S5
+
+    %% Server internal
+    S2 --> S6
+    S3 --> S6
+
+    %% Server -> Data
+    S1 --> D1
+    S5 --> D2
+    S3 --> D3
+    S3 --> D4
+
+    %% Server -> External
+    S6 --> X1
+    S6 --> X2
+    S4 --> X3
+    S3 --> X4
+    S3 --> X5
+    S3 --> X6

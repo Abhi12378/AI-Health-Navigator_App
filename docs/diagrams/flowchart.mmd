@@ -1,0 +1,59 @@
+flowchart TD
+    %% ===== Styles =====
+    classDef user fill:#EEF2FF,stroke:#4F46E5,stroke-width:1.2px,color:#111827
+    classDef ui fill:#EFF6FF,stroke:#2563EB,stroke-width:1.2px,color:#111827
+    classDef api fill:#ECFDF5,stroke:#059669,stroke-width:1.2px,color:#111827
+    classDef ai fill:#FFF7ED,stroke:#EA580C,stroke-width:1.2px,color:#111827
+    classDef ext fill:#FEF2F2,stroke:#DC2626,stroke-width:1.2px,color:#111827
+    classDef store fill:#F8FAFC,stroke:#475569,stroke-width:1.2px,color:#111827
+    classDef decision fill:#FFFFFF,stroke:#111827,stroke-width:1.4px,color:#111827
+
+    A([User Opens App]):::user --> B{Authenticated?}:::decision
+
+    B -->|No| C[Login Page\nGoogle OAuth or Guest]:::ui
+    C --> D[Create Session / Guest Context]:::api
+    D --> E[Open Chat Workspace]:::ui
+
+    B -->|Yes| E
+
+    E --> F{User Action}:::decision
+
+    %% Chat path
+    F -->|Ask Symptom Question| G[POST /api/chat with message]:::api
+    G --> H{File Attached?}:::decision
+
+    H -->|No| I[Try Bedrock (Claude)]:::ai
+    I --> J{Bedrock Success?}:::decision
+    J -->|Yes| K[Return Structured Health Guidance\n+ Safety Advisory + Disclaimer]:::api
+    J -->|No + Fallback Allowed| L[Route to Gemini Fallback]:::ai
+    L --> K
+    J -->|No + Fallback Blocked| M[Return Error Response]:::api
+
+    %% Document path
+    H -->|Yes (PDF/Image)| N[Validate + Normalize Document]:::api
+    N --> O[Store report metadata per user]:::store
+    O --> P[Document Analysis via Gemini Path]:::ai
+    P --> Q[Return summary, abnormal values,\nurgency hints, safety advisory]:::api
+
+    %% Other features
+    F -->|Find Nearby Hospital| R[GET /api/hospitals/nearby]:::api
+    R --> S[Google Places Lookup]:::ext
+    S --> T[Hospital list with distance,\nopen status, emergency indicators]:::ui
+
+    F -->|Manage Medical History| U[GET/POST/DELETE /api/medical-history]:::api
+    F -->|Manage Lab Reports| V[GET/POST/DELETE /api/lab-reports]:::api
+    F -->|Manage Prescriptions| W[GET/POST/DELETE /api/prescriptions]:::api
+
+    %% End states
+    K --> X([Render AI Response in Chat UI]):::ui
+    Q --> X
+    T --> X
+    U --> X
+    V --> X
+    W --> X
+    M --> Y([Show Error + Retry Guidance]):::ui
+
+    %% Legend-ish connectors to external services
+    I -.calls.-> Z1[(AWS Bedrock)]:::ext
+    P -.calls.-> Z2[(Google Gemini)]:::ext
+    R -.calls.-> Z3[(Google Places API)]:::ext
