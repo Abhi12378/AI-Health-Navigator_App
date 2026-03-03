@@ -511,6 +511,13 @@ async function createApp(options: AppBootstrapOptions = {}) {
   const PORT = Number(process.env.PORT || 3000);
   const isProduction = process.env.NODE_ENV === 'production';
   const distPath = path.join(process.cwd(), 'dist');
+  const googleConfigStatus = getGoogleConfigStatus();
+
+  if (googleConfigStatus.missing.length > 0) {
+    console.warn(`Google OAuth is not fully configured. Missing env vars: ${googleConfigStatus.missing.join(', ')}`);
+  } else {
+    console.log(`Google OAuth env vars detected. Callback URL: ${googleConfigStatus.callbackURL}`);
+  }
 
   app.get('/healthz', (_req, res) => {
     res.status(200).json({ ok: true });
