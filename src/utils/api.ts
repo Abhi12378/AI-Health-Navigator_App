@@ -1,4 +1,7 @@
-export const API_BASE_URL = '/api';
+const apiBaseFromEnv = (import.meta as any)?.env?.VITE_API_BASE_URL;
+export const API_BASE_URL = typeof apiBaseFromEnv === 'string' && apiBaseFromEnv.trim().length > 0
+  ? apiBaseFromEnv.trim().replace(/\/$/, '')
+  : '/api';
 
 interface RequestOptions extends RequestInit {
   headers?: Record<string, string>;

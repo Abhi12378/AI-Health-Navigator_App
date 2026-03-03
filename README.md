@@ -222,6 +222,43 @@ App runs at:
 
 ---
 
+## Run with Docker
+
+### Prerequisites
+- Docker Desktop installed and running
+
+### 1) Configure environment
+
+Create `.env.local` from `.env.example` and set required values.
+
+### 2) Build and run with Docker Compose
+
+```bash
+docker compose up -d --build
+```
+
+### 3) Check status/logs
+
+```bash
+docker compose ps
+docker compose logs -f
+```
+
+### 4) Stop containers
+
+```bash
+docker compose down
+```
+
+### Direct Docker commands (optional)
+
+```bash
+npm run docker:build
+npm run docker:run
+```
+
+---
+
 ## Available Scripts
 
 From `package.json`:
@@ -361,6 +398,96 @@ Implications:
 - Provide all required environment variables in deployment secrets.
 - Configure HTTPS and trusted proxy headers if running behind a reverse proxy.
 - Replace in-memory data stores with persistent storage before production use.
+
+### Automatic AWS prototype link (App Runner)
+
+This repository includes automatic deployment tooling for a public prototype URL on AWS App Runner.
+
+#### Local one-command deploy
+
+1. Ensure prerequisites:
+   - Docker installed and running
+   - AWS credentials configured (`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` or profile)
+   - `AWS_REGION` set
+
+2. Run:
+
+```bash
+npm install
+npm run deploy:aws
+```
+
+This command automatically:
+- creates (or reuses) an ECR repository,
+- builds and pushes Docker image,
+- creates (or updates) an App Runner service,
+- prints your live prototype URL.
+
+#### Fully automatic deploy from GitHub
+
+Workflow file: `.github/workflows/deploy-apprunner.yml`
+
+On every push to `main`, GitHub Actions deploys the latest version.
+
+Required GitHub repository secrets:
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `AWS_REGION`
+- `SESSION_SECRET`
+- `GEMINI_API_KEY` (if Gemini flows are used)
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (if OAuth is used)
+- optional: `GOOGLE_MAPS_API_KEY`, `AWS_SESSION_TOKEN`
+
+Recommended GitHub repository variables:
+- `APP_RUNNER_SERVICE_NAME`
+- `ECR_REPOSITORY_NAME`
+- `BEDROCK_MODEL_ID`
+- `GEMINI_MODEL_ID`
+- `ALLOW_GEMINI_FALLBACK`
+- `BEDROCK_RECHECK_INTERVAL_MS`
+- `GOOGLE_CALLBACK_URL`
+- `APP_BASE_URL`
+- `AWS_S3_BUCKET_NAME`
+
+---
+
+## Alternative: Full-stack prototype on Render (recommended fallback)
+
+If App Runner or Netlify function permissions block AI/provider calls, deploy the same full-stack app on Render using Docker.
+
+### Why Render here
+
+- Single web service runs both UI and API (`/api/*`, `/auth/*`) together.
+- No serverless cold-start role confusion for AWS SDK credentials.
+- Existing `Dockerfile` already works for production.
+
+### Quick deploy steps
+
+1. Push this repo to GitHub (if not already).
+2. In Render, click **New +** -> **Blueprint** and select this repo.
+3. Render auto-detects [`render.yaml`](render.yaml) and creates the web service.
+4. Add secrets from [`.env.render.example`](.env.render.example) in Render dashboard.
+5. Deploy and open your Render URL.
+
+Detailed step-by-step guide: [docs/render-deploy-runbook.md](docs/render-deploy-runbook.md)
+
+### Required production secrets on Render
+
+- `SESSION_SECRET`
+- `AWS_REGION`
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `GEMINI_API_KEY`
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (for OAuth)
+- `GOOGLE_MAPS_API_KEY` (optional but recommended)
+
+### Google OAuth callback on Render
+
+Set:
+
+`GOOGLE_CALLBACK_URL=https://<your-render-service>.onrender.com/auth/google/callback`
+
+Also add the same URL in Google Cloud Console -> OAuth -> Authorized redirect URIs.
 
 ---
 

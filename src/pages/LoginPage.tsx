@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Activity, ShieldCheck, HeartPulse, ArrowRight, Stethoscope } from 'lucide-react';
@@ -7,6 +7,26 @@ import { useAuth } from '../context/AuthContext';
 const LoginPage = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const [googleAvailable, setGoogleAvailable] = useState(true);
+
+  useEffect(() => {
+    const checkGoogleAvailability = async () => {
+      try {
+        const response = await fetch('/api/auth/providers');
+        if (!response.ok) {
+          setGoogleAvailable(false);
+          return;
+        }
+
+        const data = await response.json();
+        setGoogleAvailable(Boolean(data?.google));
+      } catch {
+        setGoogleAvailable(false);
+      }
+    };
+
+    checkGoogleAvailability();
+  }, []);
 
   const handleGuestLogin = async () => {
     // Track guest click
@@ -19,6 +39,7 @@ const LoginPage = () => {
 
   const handleGoogleLogin = async (e: React.MouseEvent) => {
     e.preventDefault();
+    if (!googleAvailable) return;
     // Track login click
     const currentLoginClicks = parseInt(localStorage.getItem('admin_login_clicks') || '0');
     localStorage.setItem('admin_login_clicks', (currentLoginClicks + 1).toString());
@@ -121,9 +142,14 @@ const LoginPage = () => {
 
               <div className="space-y-4">
                 <a 
-                  href="/auth/google"
+                  href={googleAvailable ? '/auth/google' : '#'}
                   onClick={handleGoogleLogin}
-                  className="flex items-center justify-center w-full px-6 py-3.5 text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:border-slate-300 hover:shadow-md transition-all duration-200 group/btn"
+                  aria-disabled={!googleAvailable}
+                  className={`flex items-center justify-center w-full px-6 py-3.5 border rounded-xl transition-all duration-200 group/btn ${
+                    googleAvailable
+                      ? 'text-slate-700 bg-white border-slate-200 hover:bg-slate-50 hover:border-slate-300 hover:shadow-md'
+                      : 'text-slate-400 bg-slate-100 border-slate-200 cursor-not-allowed pointer-events-none'
+                  }`}
                 >
                   <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
                     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
@@ -133,6 +159,11 @@ const LoginPage = () => {
                   </svg>
                   <span className="font-semibold">Continue with Google</span>
                 </a>
+                {!googleAvailable && (
+                  <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    Google sign-in is currently unavailable. Please continue as guest.
+                  </p>
+                )}
 
                 <div className="relative flex py-2 items-center">
                   <div className="flex-grow border-t border-slate-200"></div>

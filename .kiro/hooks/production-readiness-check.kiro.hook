@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Production Readiness Check",
+  "description": "Comprehensive check to verify if the project is production ready including tests, linting, build validation, security checks, and configuration review",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Perform a comprehensive production readiness assessment:\n\n1. Run and verify all tests pass (npm test or equivalent)\n2. Check for linting errors (npm run lint or equivalent)\n3. Verify the project builds successfully (npm run build or equivalent)\n4. Review security: check for vulnerabilities in dependencies (npm audit)\n5. Validate environment configuration (.env files, required variables)\n6. Check Docker configuration if present (Dockerfile, docker-compose.yml)\n7. Review deployment configs (netlify.toml, render.yaml, etc.)\n8. Verify all critical files are present (README, LICENSE, package.json)\n9. Check git status for uncommitted changes\n10. Review error handling and logging implementation\n11. Validate API endpoints and authentication flows\n12. Check for TODO/FIXME comments in critical code\n\nProvide a detailed report with:\n- ✅ What's ready for production\n- ⚠️ Warnings or recommendations\n- ❌ Blockers that must be fixed before deployment\n- Overall production readiness score and recommendation"
+  }
+}

@@ -3,19 +3,37 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "tsx server.ts",
     "build": "vite build",
+    "build:aws-server": "esbuild server.ts --bundle --platform=node --format=esm --packages=external --outfile=server.mjs",
+    "build:cloud": "npm run build && npm run build:aws-server",
+    "build:server": "esbuild server.ts --bundle --platform=node --format=esm --packages=external --outfile=electron-dist/server.mjs",
+    "make:icon": "node scripts/generate-stethoscope-icon.mjs",
+    "build:desktop": "npm run make:icon && npm run build && npm run build:server",
+    "dist:win": "npm run build:desktop && electron-builder --win",
+    "electron:start": "electron .",
     "preview": "vite preview",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "docker:build": "docker build -t ai-health-navigator:latest .",
+    "docker:run": "docker run --rm -p 3000:3000 --env-file .env.local --name ai-health-navigator ai-health-navigator:latest",
+    "docker:up": "docker compose up --build -d",
+    "docker:down": "docker compose down",
+    "deploy:aws": "node scripts/deploy-apprunner.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-apprunner": "^3.1000.0",
     "@aws-sdk/client-bedrock-runtime": "^3.1000.0",
     "@aws-sdk/client-comprehendmedical": "^3.1000.0",
+    "@aws-sdk/client-ecr": "^3.1000.0",
+    "@aws-sdk/client-iam": "^3.1000.0",
     "@aws-sdk/client-s3": "^3.1000.0",
+    "@aws-sdk/client-sts": "^3.1000.0",
     "@aws-sdk/client-textract": "^3.1000.0",
     "@google/genai": "^1.29.0",
+    "@netlify/functions": "^5.1.2",
     "@tailwindcss/typography": "^0.5.19",
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
@@ -23,14 +41,18 @@
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
     "express": "^4.22.1",
+    "express-session": "^1.19.0",
     "framer-motion": "^12.34.3",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.13.1",
     "recharts": "^3.7.0",
+    "serverless-http": "^4.0.0",
     "sharp": "^0.34.5",
     "vite": "^6.2.0"
   },
@@ -41,12 +63,42 @@
     "@types/passport": "^1.0.17",
     "@types/passport-google-oauth20": "^2.0.17",
     "autoprefixer": "^10.4.21",
-    "express-session": "^1.19.0",
-    "passport": "^0.7.0",
-    "passport-google-oauth20": "^2.0.0",
+    "electron": "^40.6.1",
+    "electron-builder": "^26.8.1",
+    "esbuild": "^0.27.3",
+    "png-to-ico": "^3.0.1",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
+  },
+  "build": {
+    "appId": "com.aihealthnavigator.app",
+    "productName": "AI Health Navigator",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "electron-dist/**/*",
+      "assets/icons/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "assets/icons/stethoscope.ico",
+      "executableName": "AI Health Navigator"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "AI Health Navigator"
+    }
   }
 }
