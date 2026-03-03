@@ -28,7 +28,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 	&& rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+RUN npm ci --omit=dev \
+	&& npm install --omit=dev express-session@1.19.0 \
+	&& node -e "import('express-session').then(() => console.log('express-session resolved')).catch((error) => { console.error(error); process.exit(1); })" \
+	&& npm cache clean --force
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/server.mjs ./server.mjs
