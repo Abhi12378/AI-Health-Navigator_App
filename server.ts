@@ -2,14 +2,13 @@ import express from 'express';
 import session from 'express-session';
 import passport from './src/config/passport';
 import { ensureGoogleStrategyConfigured } from './src/config/passport';
-import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { TextractClient, AnalyzeDocumentCommand, DetectDocumentTextCommand } from "@aws-sdk/client-textract";
 import { ComprehendMedicalClient, DetectEntitiesV2Command } from "@aws-sdk/client-comprehendmedical";
 import crypto from 'crypto';
-import sharp from 'sharp';
+import path from 'path';
 
 dotenv.config({ path: '.env.local' });
 dotenv.config();
@@ -82,6 +81,7 @@ async function normalizeDocumentForTextract(buffer: Buffer, mimeType: string): P
   }
 
   if (mimeType.startsWith('image/')) {
+    const { default: sharp } = await import('sharp');
     const converted = await sharp(buffer).png().toBuffer();
     return { buffer: converted, mimeType: 'image/png' };
   }
@@ -201,8 +201,17 @@ function shouldFallbackToGemini(error: any): boolean {
     return true;
   }
 
-  if (
+  const isAuthzError =
     code.includes('AccessDenied') ||
+    message.includes('NOT AUTHORIZED TO PERFORM') ||
+    message.includes('BEDROCK:INVOKEMODEL') ||
+    message.includes('NO IDENTITY-BASED POLICY ALLOWS');
+
+  if (isAuthzError) {
+    return true;
+  }
+
+  if (
     code.includes('ValidationException') ||
     code.includes('ResourceNotFound') ||
     message.includes('MODEL ACCESS IS DENIED')
@@ -219,6 +228,29 @@ function isBillingBlockedError(error: any): boolean {
     message.includes('INVALID_PAYMENT_INSTRUMENT') ||
     message.includes('AWS MARKETPLACE SUBSCRIPTION')
   );
+}
+
+function buildFallbackHospitals(lat: number, lng: number) {
+  const offsets = [
+    { latOffset: 0.008, lngOffset: 0.006, name: 'City Care Hospital' },
+    { latOffset: -0.011, lngOffset: 0.01, name: 'Metro General Hospital' },
+    { latOffset: 0.013, lngOffset: -0.009, name: 'Community Health Center' },
+    { latOffset: -0.007, lngOffset: -0.012, name: 'Emergency Medical Center' },
+    { latOffset: 0.016, lngOffset: 0.004, name: 'Regional Multi-speciality Hospital' },
+  ];
+
+  return offsets.map((item, index) => ({
+    id: `fallback-${index}`,
+    name: item.name,
+    type: item.name.toLowerCase().includes('emergency') ? 'Emergency Center' : 'Hospital',
+    latitude: Number((lat + item.latOffset).toFixed(6)),
+    longitude: Number((lng + item.lngOffset).toFixed(6)),
+    address: 'Nearby healthcare provider (fallback listing)',
+    phone: 'Not available',
+    rating: 4.1,
+    isOpen: true,
+    isEmergency: item.name.toLowerCase().includes('emergency'),
+  }));
 }
 
 function markBedrockTemporarilyUnavailable(reason: string) {
@@ -467,10 +499,22 @@ async function classifyUploadedDocumentCategory(fileName: string, mimeType: stri
   return inferDocumentCategoryFromName(fileName);
 }
 
-async function startServer() {
+type AppBootstrapOptions = {
+  serveFrontend?: boolean;
+  isServerless?: boolean;
+};
+
+async function createApp(options: AppBootstrapOptions = {}) {
   const app = express();
-  const PORT = 3000;
+  app.set('trust proxy', 1);
+  const PORT = Number(process.env.PORT || 3000);
   const isProduction = process.env.NODE_ENV === 'production';
+  const distPath = path.join(process.cwd(), 'dist');
+
+  app.get('/healthz', (_req, res) => {
+    res.status(200).json({ ok: true });
+  });
+
   const getGoogleCallbackURL = (req: express.Request) => {
     if (process.env.GOOGLE_CALLBACK_URL) {
       return process.env.GOOGLE_CALLBACK_URL;
@@ -497,11 +541,13 @@ async function startServer() {
   const labReportsByUser: Record<string, StoredLabReport[]> = {};
   const prescriptionsByUser: Record<string, StoredLabReport[]> = {};
 
-  setInterval(() => {
-    probeBedrockRecovery().catch((error) => {
-      console.warn('Bedrock recovery probe failed:', error);
-    });
-  }, BEDROCK_RECHECK_INTERVAL_MS);
+  if (!options.isServerless) {
+    setInterval(() => {
+      probeBedrockRecovery().catch((error) => {
+        console.warn('Bedrock recovery probe failed:', error);
+      });
+    }, BEDROCK_RECHECK_INTERVAL_MS);
+  }
 
   app.use(express.json({ limit: '10mb' })); // Increased limit for base64 images
 
@@ -532,7 +578,11 @@ async function startServer() {
       }
 
       if (!GOOGLE_MAPS_API_KEY) {
-        return res.status(500).json({ error: 'GOOGLE_MAPS_API_KEY is not configured.' });
+        return res.json({
+          hospitals: buildFallbackHospitals(lat, lng),
+          source: 'fallback',
+          warning: 'GOOGLE_MAPS_API_KEY is not configured. Returning fallback hospitals.',
+        });
       }
 
       const radiusMeters = Math.round(radiusKm * 1000);
@@ -541,8 +591,10 @@ async function startServer() {
       const placesData = await placesResponse.json() as any;
 
       if (!placesResponse.ok || (placesData.status && placesData.status !== 'OK' && placesData.status !== 'ZERO_RESULTS')) {
-        return res.status(502).json({
-          error: 'Google Places API error',
+        return res.json({
+          hospitals: buildFallbackHospitals(lat, lng),
+          source: 'fallback',
+          warning: 'Google Places API error. Returning fallback hospitals.',
           details: placesData.error_message || placesData.status || 'Unknown error',
         });
       }
@@ -773,7 +825,7 @@ Do not include any text outside the JSON object.`;
 
   app.get('/auth/google', (req, res, next) => {
     if (!ensureGoogleStrategyConfigured()) {
-      return res.status(501).send('Google Authentication not configured. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in the Secrets panel.');
+      return res.redirect('/login?authError=google_not_configured');
     }
     const callbackURL = getGoogleCallbackURL(req);
     passport.authenticate('google', { scope: ['profile', 'email'], callbackURL })(req, res, next);
@@ -783,7 +835,7 @@ Do not include any text outside the JSON object.`;
     '/auth/google/callback',
     (req, res, next) => {
       if (!ensureGoogleStrategyConfigured()) {
-        return res.status(501).send('Google Authentication not configured. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in the Secrets panel.');
+        return res.redirect('/login?authError=google_not_configured');
       }
       const callbackURL = getGoogleCallbackURL(req);
       passport.authenticate('google', { failureRedirect: '/login', callbackURL })(req, res, next);
@@ -798,6 +850,13 @@ Do not include any text outside the JSON object.`;
 
   app.get('/api/user', (req, res) => {
     res.json(req.user || null);
+  });
+
+  app.get('/api/auth/providers', (req, res) => {
+    res.json({
+      google: ensureGoogleStrategyConfigured(),
+      guest: true,
+    });
   });
 
   // Medical History Store (In-memory for demo)
@@ -994,17 +1053,41 @@ Do not include any text outside the JSON object.`;
     res.json({ success: true });
   });
 
-  if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
+  if (options.serveFrontend) {
+    if (!isProduction) {
+      const viteModuleName = 'vite';
+      const { createServer: createViteServer } = await import(viteModuleName);
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: 'spa',
+      });
+      app.use(vite.middlewares);
+    } else {
+      app.use(express.static(distPath));
+      app.get('*', (req, res, next) => {
+        if (req.path.startsWith('/api') || req.path.startsWith('/auth')) {
+          return next();
+        }
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
+    }
   }
+
+  return app;
+}
+
+async function startServer() {
+  const app = await createApp({ serveFrontend: true, isServerless: false });
+  const PORT = Number(process.env.PORT || 3000);
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }
 
-startServer();
+export { createApp, startServer };
+
+const entryArg = process.argv[1] || '';
+if (/server(\.ts|\.mjs|\.js)$/i.test(entryArg) && process.env.NETLIFY !== 'true') {
+  startServer();
+}

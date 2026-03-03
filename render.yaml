@@ -5,12 +5,10 @@ services:
     plan: free
     dockerfilePath: ./Dockerfile
     autoDeploy: true
-    healthCheckPath: /api/user
+    healthCheckPath: /healthz
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 3000
       - key: SESSION_SECRET
         generateValue: true
       - key: AWS_REGION
