@@ -30,9 +30,9 @@ services:
       - key: GOOGLE_CLIENT_SECRET
         sync: false
       - key: GOOGLE_CALLBACK_URL
-        sync: false
+        value: https://ai-health-navigator.onrender.com/auth/google/callback
       - key: APP_BASE_URL
-        sync: false
+        value: https://ai-health-navigator.onrender.com
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL_ID

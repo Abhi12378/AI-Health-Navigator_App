@@ -2,6 +2,7 @@ import express from 'express';
 import session from 'express-session';
 import passport from './src/config/passport';
 import { ensureGoogleStrategyConfigured } from './src/config/passport';
+import { getGoogleConfigStatus } from './src/config/passport';
 import dotenv from 'dotenv';
 import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
@@ -853,8 +854,11 @@ Do not include any text outside the JSON object.`;
   });
 
   app.get('/api/auth/providers', (req, res) => {
+    const googleConfig = getGoogleConfigStatus();
     res.json({
       google: ensureGoogleStrategyConfigured(),
+      googleMissingEnv: googleConfig.missing,
+      googleCallbackURL: googleConfig.callbackURL,
       guest: true,
     });
   });
