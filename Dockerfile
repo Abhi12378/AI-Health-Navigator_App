@@ -12,7 +12,8 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
-RUN npm run build:cloud
+RUN npm run build
+RUN npx esbuild server.ts --bundle --platform=node --format=esm --packages=external --outfile=server.mjs
 RUN npm prune --omit=dev
 
 FROM node:20-bookworm-slim AS runner
